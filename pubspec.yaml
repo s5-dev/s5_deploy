@@ -1,0 +1,24 @@
+name: s5_deploy
+description: A sample command-line application.
+version: 0.0.1
+repository: https://github.com/s5-dev/s5_deploy
+
+environment:
+  sdk: ^3.4.1
+
+# Add regular dependencies here.
+dependencies:
+  ansicolor: ^2.0.2
+  args: ^2.5.0
+  dcli: ^4.0.1-beta.4
+  hive: ^2.2.3
+  http: ^1.2.1
+  lib5: ^0.2.0
+  lib5_crypto_implementation_dart: ^0.2.0
+  path: ^1.9.0
+  s5: ^0.2.0
+  xdg_directories: ^1.0.4
+
+dev_dependencies:
+  lints: ^4.0.0
+  test: ^1.24.0
