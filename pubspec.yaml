@@ -1,6 +1,6 @@
 name: s5_deploy
 description: A sample command-line application.
-version: 0.0.1
+version: 0.1.0
 repository: https://github.com/s5-dev/s5_deploy
 
 environment:
@@ -10,13 +10,16 @@ environment:
 dependencies:
   ansicolor: ^2.0.2
   args: ^2.5.0
+  bip39: ^1.0.6
   cli_spin: ^1.0.1
+  convert: ^3.1.1
   dcli: ^4.0.1-beta.4
   hive: ^2.2.3
   http: ^1.2.1
   http_parser: ^4.0.2
   lib5: ^0.2.0
   lib5_crypto_implementation_dart: ^0.2.0
+  mime: ^1.0.5
   path: ^1.9.0
   s5: ^0.2.0
   xdg_directories: ^1.0.4

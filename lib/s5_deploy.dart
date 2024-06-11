@@ -4,6 +4,7 @@ import 'package:args/args.dart';
 import 'package:cli_spin/cli_spin.dart';
 import 'package:dcli/dcli.dart';
 import 'package:lib5/node.dart';
+import 'package:mime/mime.dart';
 import 'package:path/path.dart';
 import 'package:s5/s5.dart';
 import 'package:s5_deploy/definitons/constants.dart';
@@ -86,9 +87,47 @@ void s5Deploy(List<String> args) async {
 
   // now upload to S5 & set registry
   spinner = spinStart("Uploading to S5...");
-  print(s5.hasIdentity);
-  print((s5.api as S5NodeAPIWithIdentity).accountConfigs);
-  spinner.success();
+  S5NodeAPIWithIdentity nodewIden = (s5.api as S5NodeAPIWithIdentity);
+  final CID staticCID = await uploadDirectory(
+      procDir.fileStreams, procDir.lengths, nodewIden, "",
+      lookupMimeType: lookupMimeType);
+
+  if (staticCID.hash.toString() != "") {
+    spinner.success();
+  } else {
+    spinner.fail();
+  }
+
+  // Then give the CIDs to the users
+  if ((results['static'] as bool)) {
+    print(green("Sucsesss!"));
+    print("${green("Static Link:")} s5://${staticCID.toBase58()}");
+  } else {
+    // get resolver link
+    spinner = spinStart("Updating resolver link...");
+    final resolverCID =
+        await updateResolver(s5, results.arguments.first, staticCID);
+    spinner.success();
+
+    // Then a little url manipulation
+    final nodeURI = Uri.parse(nodeURL);
+    final finalURI =
+        nodeURI.replace(host: "${resolverCID.toBase32()}.${nodeURI.host}");
+
+    // now print out to the user
+    print(green("Sucsesss!"));
+    print("${green("Static Link:")} s5://${staticCID.toBase58()}");
+    print("${green("Resolver Link:")} s5://${resolverCID.toBase58()}");
+    print("${green("Resolver Link Subdomain:")} ${finalURI.toString()}");
+    print(
+        "NOTE: This subdomain may not work depending on wildcard permissions");
+    var confirmed =
+        confirm('Would you like DNSLink instructions?', defaultValue: true);
+    if (confirmed) {
+      print(
+          "Please put this ${magenta('TXT')} record on your domain: ${green('dnslink=/s5/${resolverCID.toBase58()}')}");
+    }
+  }
 
   // And it's over folks
   exit(0);

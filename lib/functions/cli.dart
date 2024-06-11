@@ -10,26 +10,37 @@ ArgParser defineArguments() {
       abbr: 'V',
       defaultsTo: false,
       negatable: false,
-      help: 'Gets the version number of package.');
+      help: 'Gets the version number of package');
 
   // -h || --help
   topParser.addFlag('help',
+      negatable: false,
       abbr: 'h',
       defaultsTo: false,
-      negatable: false,
       help: 'Print help dialoge.');
 
   // --reset
   topParser.addFlag('reset',
-      defaultsTo: false,
       negatable: false,
+      defaultsTo: false,
       help: 'Resets local node ${red("BE CAREFUL")}');
+
+  // --static
+  topParser.addFlag('static',
+      negatable: false, defaultsTo: false, help: 'Skips resolver deploy');
 
   // -s || --server
   topParser.addOption('node',
       abbr: 'n',
       defaultsTo: 'https://s5.ninja',
-      help: 'Which S5 node to deploy to.');
+      help: 'Which S5 node to deploy to');
+
+  // -S || --seed
+  topParser.addOption(
+    'seed',
+    abbr: 'S',
+    help: 'Set seed to recover DNS Link Entry',
+  );
 
   return topParser;
 }
