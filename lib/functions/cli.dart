@@ -42,6 +42,12 @@ ArgParser defineArguments() {
     help: 'Set seed to recover DNS Link Entry',
   );
 
+  // -d || --dataKey
+  topParser.addOption('dataKey',
+      abbr: 'd',
+      defaultsTo: null,
+      help: 'Set the datakey of the upload, defaults to target directory');
+
   return topParser;
 }
 

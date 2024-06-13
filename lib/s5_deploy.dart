@@ -14,12 +14,15 @@ import 'package:s5_deploy/functions/s5.dart';
 import 'package:s5_deploy/functions/spinner.dart';
 import 'package:xdg_directories/xdg_directories.dart';
 
+final String configPath = join(configHome.path, 's5_deploy');
+final String dbPath = join(configPath, 'db');
+final String logPath = join(configPath, 'logs');
+
 void s5Deploy(List<String> args) async {
   // define paths
-  final dbPath = join(configHome.path, 's5_deploy', 'db');
-  final logPath = join(configHome.path, 's5_deploy', 'logs');
-  await ensureDirExistence(Directory(dbPath));
-  await ensureDirExistence(Directory(logPath));
+
+  await (Directory(dbPath)).create(recursive: true);
+  await (Directory(logPath)).create(recursive: true);
 
   // Define arguments
   ArgParser topParser = defineArguments();
@@ -56,8 +59,10 @@ void s5Deploy(List<String> args) async {
 
   // --reset
   bool resetCheck = results['reset'] as bool;
-  if (resetCheck) {
-    await Directory(dbPath).delete(recursive: true);
+  if (resetCheck && Directory(configPath).listSync().isNotEmpty) {
+    await Directory(configPath).delete(recursive: true);
+    await (Directory(dbPath)).create(recursive: true);
+    await (Directory(logPath)).create(recursive: true);
   }
 
   spinner.success();
@@ -65,7 +70,8 @@ void s5Deploy(List<String> args) async {
   // init s5
   spinner = spinStart("Initializing S5...");
   String nodeURL = results['node'] as String;
-  final S5 s5 = await initS5(nodeURL, dbPath, logPath);
+  final S5 s5 =
+      await initS5(nodeURL, dbPath, logPath, (results['seed'] as String?));
   spinner.success();
 
   // scan directory
@@ -105,8 +111,8 @@ void s5Deploy(List<String> args) async {
   } else {
     // get resolver link
     spinner = spinStart("Updating resolver link...");
-    final resolverCID =
-        await updateResolver(s5, results.arguments.first, staticCID);
+    final resolverCID = await updateResolver(s5, results.arguments.first,
+        staticCID, spinner, (results['dataKey'] as String?));
     spinner.success();
 
     // Then a little url manipulation

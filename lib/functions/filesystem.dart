@@ -7,12 +7,6 @@ class ProcessedDirectory {
   ProcessedDirectory();
 }
 
-Future<void> ensureDirExistence(Directory directory) async {
-  if (!await directory.exists()) {
-    await directory.create(recursive: true);
-  }
-}
-
 ProcessedDirectory processDirectory(Directory dir, String topDir) {
   ProcessedDirectory procDir = ProcessedDirectory();
   for (final entity in dir.listSync()) {

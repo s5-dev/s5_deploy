@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:convert/convert.dart';
+import 'package:cli_spin/cli_spin.dart';
 import 'package:dcli/dcli.dart';
 import 'package:hive/hive.dart';
 import 'package:http_parser/http_parser.dart';
@@ -14,9 +14,11 @@ import 'package:s5_deploy/definitons/logging.dart';
 import 'package:s5/s5.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:bip39/bip39.dart' as bip39;
+import 'package:s5_deploy/functions/config.dart';
+import 'package:xdg_directories/xdg_directories.dart';
 
-Future<S5> initS5(String nodeURL, String dbPath, String logPath) async {
+Future<S5> initS5(
+    String nodeURL, String dbPath, String logPath, String? inputSeed) async {
   final nowInMilliseconds = DateTime.now().millisecondsSinceEpoch;
   final lastEightDigits = nowInMilliseconds
       .toString()
@@ -25,22 +27,29 @@ Future<S5> initS5(String nodeURL, String dbPath, String logPath) async {
   final S5 s5 = await S5.create(
       logger: FileLogger(file: join(logPath, 'log-$lastEightDigits.txt')));
   if (!s5.hasIdentity) {
-    final seed = s5.generateSeedPhrase();
-    print("");
-    print(
-        "This is your ${green("seed")}. If you want to keep updating this registry entry in the future you ${green("MUST")} have this seed");
-    print(green(seed));
-    var confirmed = confirm('Have you written this down:', defaultValue: true);
-    if (!confirmed) {
+    String seed = "";
+    if (inputSeed != null) {
+      seed = inputSeed;
+    } else {
+      seed = s5.generateSeedPhrase();
+      print("");
       print(
-          "No like I'm ${red("serious")}, write this down. But to each their own.");
+          "This is your ${green("seed")}. If you want to keep updating this registry entry in the future you ${green("MUST")} have this seed");
+      print(green(seed));
+      var confirmed =
+          confirm('Have you written this down:', defaultValue: true);
+      if (!confirmed) {
+        print(
+            "No like I'm ${red("serious")}, write this down. But to each their own.");
+      }
     }
-    Box<dynamic> box = await Hive.openBox('s5_deploy');
-    box.put('seed', seed);
+    setConfig(DeployConfig(seed: seed, dataKeys: []));
     await s5.recoverIdentityFromSeedPhrase(seed);
+    // if (inputSeed == null) {
     await s5.registerOnNewStorageService(
       nodeURL,
     );
+    // }
   }
   return s5;
 }
@@ -105,55 +114,61 @@ Future<CID> uploadDirectory(
   return CID.decode(resData['cid']);
 }
 
-Future<CID> updateResolver(S5 s5, String dir, CID staticCID) async {
-  Box<dynamic> box = await Hive.openBox('s5_deploy');
-  String seed = box.get('seed');
-  String dataKey = "";
-  try {
-    dataKey = box.get('datakey');
-  } catch (_) {
-    dataKey = 'project-${Directory(dir).absolute.path}';
-  }
-
-  final resolverSeed = s5.api.crypto.hashBlake3Sync(
-    Uint8List.fromList(
-      validatePhrase(seed, crypto: s5.api.crypto) + utf8.encode(dataKey),
-    ),
-  );
-
-  final s5User = await s5.api.crypto.newKeyPairEd25519(seed: resolverSeed);
-
-  SignedRegistryEntry? existing;
-
-  try {
-    final res = await s5.api.registryGet(s5User.publicKey);
-    existing = res;
-    if (existing != null) {
-      print(
-        'Revision ${existing.revision} -> ${existing.revision + 1}',
-      );
+Future<CID> updateResolver(
+    S5 s5, String dir, CID staticCID, CliSpin spinner, String? dataKey) async {
+  DeployConfig? conf = getConfig(spinner);
+  if (conf != null) {
+    String seed = conf.seed;
+    dataKey ??= 'project-${Directory(dir).absolute.path}';
+    if (!(conf.dataKeys.contains(dataKey))) {
+      conf.dataKeys.add(dataKey);
+      setConfig(conf);
     }
-  } catch (e) {
-    existing = null;
 
-    print('Revision 1');
+    final resolverSeed = s5.api.crypto.hashBlake3Sync(
+      Uint8List.fromList(
+        validatePhrase(seed, crypto: s5.api.crypto) + utf8.encode(dataKey),
+      ),
+    );
+
+    final s5User = await s5.api.crypto.newKeyPairEd25519(seed: resolverSeed);
+
+    SignedRegistryEntry? existing;
+
+    try {
+      final res = await s5.api.registryGet(s5User.publicKey);
+      existing = res;
+      if (existing != null) {
+        print(
+          'Revision ${existing.revision} -> ${existing.revision + 1}',
+        );
+      }
+    } catch (e) {
+      existing = null;
+
+      print('Revision 1');
+    }
+
+    final sre = await signRegistryEntry(
+      kp: s5User,
+      data: staticCID.toRegistryEntry(),
+      revision: (existing?.revision ?? -1) + 1,
+      crypto: s5.api.crypto,
+    );
+
+    await s5.api.registrySet(sre);
+
+    final resolverCID = CID(
+        cidTypeResolver,
+        Multihash(
+          Uint8List.fromList(
+            s5User.publicKey,
+          ),
+        ));
+    return resolverCID;
+  } else {
+    spinner.fail();
+    print(red("Config was never set. Please check permissions on $configDirs"));
+    exit(1);
   }
-
-  final sre = await signRegistryEntry(
-    kp: s5User,
-    data: staticCID.toRegistryEntry(),
-    revision: (existing?.revision ?? -1) + 1,
-    crypto: s5.api.crypto,
-  );
-
-  await s5.api.registrySet(sre);
-
-  final resolverCID = CID(
-      cidTypeResolver,
-      Multihash(
-        Uint8List.fromList(
-          s5User.publicKey,
-        ),
-      ));
-  return resolverCID;
 }
