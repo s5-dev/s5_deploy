@@ -10,7 +10,6 @@ environment:
 dependencies:
   ansicolor: ^2.0.2
   args: ^2.5.0
-  bip39: ^1.0.6
   cli_spin: ^1.0.1
   convert: ^3.1.1
   dcli: ^4.0.1-beta.4
