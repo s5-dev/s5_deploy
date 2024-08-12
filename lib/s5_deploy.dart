@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:args/args.dart';
 import 'package:cli_spin/cli_spin.dart';
 import 'package:dcli/dcli.dart';
+import 'package:lib5/identity.dart';
 import 'package:lib5/node.dart';
 import 'package:mime/mime.dart';
 import 'package:path/path.dart';
@@ -70,8 +71,14 @@ void s5Deploy(List<String> args) async {
   // init s5
   spinner = spinStart("Initializing S5...");
   String nodeURL = results['node'] as String;
-  final S5 s5 =
-      await initS5(nodeURL, dbPath, logPath, (results['seed'] as String?));
+  late S5 s5;
+  try {
+    s5 = await initS5(nodeURL, dbPath, logPath, (results['seed'] as String?));
+  } catch (e) {
+    spinner.fail();
+    print(red(e.toString()));
+  }
+
   spinner.success();
 
   // scan directory

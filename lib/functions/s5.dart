@@ -29,6 +29,8 @@ Future<S5> initS5(
   if (!s5.hasIdentity) {
     String seed = "";
     if (inputSeed != null) {
+      // first validate the seed
+      validatePhrase(inputSeed, crypto: s5.api.crypto);
       seed = inputSeed;
     } else {
       seed = s5.generateSeedPhrase();
@@ -45,11 +47,20 @@ Future<S5> initS5(
     }
     setConfig(DeployConfig(seed: seed, dataKeys: []));
     await s5.recoverIdentityFromSeedPhrase(seed);
-    // if (inputSeed == null) {
-    await s5.registerOnNewStorageService(
-      nodeURL,
-    );
-    // }
+
+    // then check if already registered
+    Map<dynamic, dynamic> data = (s5.api as S5NodeAPIWithIdentity).accounts;
+    final Map<String, dynamic> accounts =
+        data['accounts'] as Map<String, dynamic>;
+    final List<String> urls =
+        accounts.values.map((account) => account['url'] as String).toList();
+    // And if the nodeURL isn't on the seed already, authenticate on that server
+    if (!urls.contains(nodeURL)) {
+      print("Registering @ $nodeURL");
+      await s5.registerOnNewStorageService(
+        nodeURL,
+      );
+    }
   }
   return s5;
 }
