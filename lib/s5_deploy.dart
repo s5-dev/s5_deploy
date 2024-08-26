@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:args/args.dart';
 import 'package:cli_spin/cli_spin.dart';
 import 'package:dcli/dcli.dart';
-import 'package:lib5/identity.dart';
 import 'package:lib5/node.dart';
 import 'package:mime/mime.dart';
 import 'package:path/path.dart';
@@ -120,7 +119,6 @@ void s5Deploy(List<String> args) async {
     spinner = spinStart("Updating resolver link...");
     final resolverCID = await updateResolver(s5, results.arguments.first,
         staticCID, spinner, (results['dataKey'] as String?));
-    spinner.success();
 
     // Then a little url manipulation
     final nodeURI = Uri.parse(nodeURL);

@@ -15,6 +15,7 @@ import 'package:s5/s5.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:s5_deploy/functions/config.dart';
+import 'package:s5_deploy/functions/spinner.dart';
 import 'package:xdg_directories/xdg_directories.dart';
 
 Future<S5> initS5(
@@ -48,14 +49,19 @@ Future<S5> initS5(
     setConfig(DeployConfig(seed: seed, dataKeys: []));
     await s5.recoverIdentityFromSeedPhrase(seed);
 
+    // now check if already registered on node
+    List<String>? urls;
     // then check if already registered
-    Map<dynamic, dynamic> data = (s5.api as S5NodeAPIWithIdentity).accounts;
-    final Map<String, dynamic> accounts =
-        data['accounts'] as Map<String, dynamic>;
-    final List<String> urls =
-        accounts.values.map((account) => account['url'] as String).toList();
-    // And if the nodeURL isn't on the seed already, authenticate on that server
-    if (!urls.contains(nodeURL)) {
+    if ((s5.api as S5NodeAPIWithIdentity).accounts.isNotEmpty) {
+      Map<dynamic, dynamic> data = (s5.api as S5NodeAPIWithIdentity).accounts;
+      final Map<String, dynamic> accounts = (data['accounts'] as Map).map(
+        (key, value) => MapEntry(key as String, value),
+      );
+      urls =
+          accounts.values.map((account) => account['url'] as String).toList();
+      // And if the nodeURL isn't on the seed already, authenticate on that server
+    }
+    if (urls == null || !urls.contains(nodeURL)) {
       print("Registering @ $nodeURL");
       await s5.registerOnNewStorageService(
         nodeURL,
@@ -136,28 +142,27 @@ Future<CID> updateResolver(
       setConfig(conf);
     }
 
+    // Then we get get an set the resolver
     final resolverSeed = s5.api.crypto.hashBlake3Sync(
       Uint8List.fromList(
-        validatePhrase(seed, crypto: s5.api.crypto) + utf8.encode(dataKey),
+        validatePhrase(seed, crypto: s5.api.crypto) +
+            utf8.encode(dataKey), // this identifies the backup
       ),
     );
 
     final s5User = await s5.api.crypto.newKeyPairEd25519(seed: resolverSeed);
 
     SignedRegistryEntry? existing;
+    int revision = 0;
 
     try {
       final res = await s5.api.registryGet(s5User.publicKey);
       existing = res;
-      if (existing != null) {
-        print(
-          'Revision ${existing.revision} -> ${existing.revision + 1}',
-        );
-      }
+      revision = existing!.revision + 1;
     } catch (e) {
       existing = null;
 
-      print('Revision 1');
+      revision = 1;
     }
 
     final sre = await signRegistryEntry(
@@ -176,6 +181,13 @@ Future<CID> updateResolver(
             s5User.publicKey,
           ),
         ));
+
+    if (resolverCID.hash.toBase64Url() != "") {
+      spinner.success();
+      spinner = spinStart("Updating to revision $revision");
+      spinner.success();
+    }
+
     return resolverCID;
   } else {
     spinner.fail();
